@@ -36,6 +36,17 @@ describe 'Live API Testing', remote: true do
     end
   end
 
+  it 'fetches notifications' do
+    VCR.use_cassette('os-fetch-notifications', allow_playback_repeats: true) do
+      response = OneSignal.fetch_notifications
+      notification = response.first
+      expect(notification).to be_instance_of OneSignal::Responses::Notification
+      expect(response.count).to eq 51
+      # Ensure the Enumerator doesn't cache data improperly
+      expect(response.count).to eq 51
+    end
+  end
+
   it 'fectches all players' do
     VCR.use_cassette('os-fetch-players') do
       player = OneSignal.fetch_players.first
@@ -49,6 +60,32 @@ describe 'Live API Testing', remote: true do
       player = OneSignal.fetch_player @player_id
       expect(player).to be_instance_of OneSignal::Responses::Player
       expect(player.id).to eq @player_id
+    end
+  end
+
+  context 'with keys' do
+    around do |example|
+      OneSignal.config.app_id = app_id
+      OneSignal.config.api_key = api_key
+      example.run
+      OneSignal.config.app_id = nil
+      OneSignal.config.api_key = nil
+    end
+
+    it 'fetches CSV export data' do
+      VCR.use_cassette('os-csv-export') do
+        response = OneSignal.csv_export
+        expect(response).to be_instance_of OneSignal::Responses::CsvExport
+        expect(response.csv_file_url).to eq 'https://onesignal.s3.amazonaws.com/csv_exports/test/users_abc123.csv.gz'
+      end
+    end
+
+    it 'fetches CSV export data with params' do
+      VCR.use_cassette('os-csv-export', match_requests_on: [:body_as_json]) do
+        response = OneSignal.csv_export last_active_since: Time.at(1568419200)
+        expect(response).to be_instance_of OneSignal::Responses::CsvExport
+        expect(response.csv_file_url).to eq 'https://onesignal.s3.amazonaws.com/csv_exports/test/users_def456.csv.gz'
+      end
     end
   end
 end
